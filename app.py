@@ -3,8 +3,8 @@ import pandas as pd
 import joblib
 
 # Load the trained model and feature columns
-model = joblib.load("stroke_model.pkl")        # Make sure this model outputs 0, 1, 2
-features = joblib.load("features.pkl")         # List of input features
+model = joblib.load("stroke_model.pkl")  # Ensure this model outputs 0, 1, 2
+features = joblib.load("features.pkl")  # List of input features
 
 # Load custom CSS
 with open("style.css") as f:
@@ -67,43 +67,50 @@ menu = ["Login", "Sign Up"]
 choice = st.sidebar.selectbox("Navigation", menu)
 
 if choice == "Login":
-    st.subheader("🔐 User Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
 
-    if st.button("Login"):
-        if authenticate(username, password):
-            st.success(f"✅ Welcome {username}!")
-            st.markdown("---")
-            st.header("📋 Enter Your Health Details")
+    if not st.session_state.logged_in:
+        st.subheader("🔐 User Login")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
 
+        if st.button("Login"):
+            if authenticate(username, password):
+                st.success(f"✅ Welcome {username}!")
+                st.session_state.logged_in = True
+                st.session_state.username = username
+            else:
+                st.error("❌ Invalid username or password.")
+    else:
+        st.markdown("---")
+        st.header("📋 Enter Your Health Details")
+
+        with st.form("prediction_form"):
             user_input = {}
             for col in features:
                 if col in ["age", "avg_glucose_level", "bmi"]:
                     user_input[col] = st.number_input(f"{col.replace('_', ' ').capitalize()}", min_value=0.0)
                 elif col == "gender":
-                    user_input[col] = st.selectbox(f"Gender", ["Female", "Male", "Other"])
+                    user_input[col] = st.selectbox(f"{col.replace('_', ' ').capitalize()}", ["Female", "Male", "Other"])
                 elif col == "Residence_type":
-                    user_input[col] = st.selectbox(f"Residence Type", ["Urban", "Rural"])
+                    user_input[col] = st.selectbox(f"{col.replace('_', ' ').capitalize()}", ["Urban", "Rural"])
                 else:
                     user_input[col] = st.selectbox(f"{col.replace('_', ' ').capitalize()} (0 = No / 1 = Yes)", [0, 1])
 
-            if st.button("Predict Risk"):
-                # Convert gender and residence type back to numbers
-                user_input["gender"] = {"Female": 0, "Male": 1, "Other": 2}[user_input["gender"]]
-                user_input["Residence_type"] = {"Urban": 0, "Rural": 1}[user_input["Residence_type"]]
-                
-                df_input = pd.DataFrame([user_input])
-                prediction = model.predict(df_input)[0]
-                result = get_health_tips(prediction)
+            submit = st.form_submit_button("Predict Risk")
 
-                st.markdown(f"### 🧾 Prediction Result: **{result['label']}**")
-                st.markdown("#### 🩺 Personalized Healthcare Tips:")
-                for tip in result["tips"]:
-                    st.markdown(f"- {tip}")
+        if submit:
+            df_input = pd.DataFrame([user_input])
+            prediction = model.predict(df_input)[0]
+            result = get_health_tips(prediction)
 
-        else:
-            st.error("❌ Invalid username or password.")
+            st.markdown(f"### 🧾 Prediction Result: **{result['label']}**")
+            st.markdown("#### 🩺 Personalized Healthcare Tips:")
+            for tip in result["tips"]:
+                st.markdown(f"- {tip}")
+
+        st.button("Logout", on_click=lambda: st.session_state.update({"logged_in": False, "username": ""}))
 
 elif choice == "Sign Up":
     st.subheader("🆕 Create New Account")
